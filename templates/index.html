@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vietnamese Legal QA Assistant</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass {
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            background-color: rgba(255, 255, 255, 0.75);
+            border-radius: 12px;
+            border: 1px solid rgba(209, 213, 219, 0.3);
+        }
+        .chat-message {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .typing-indicator {
+            display: none;
+        }
+        .typing-indicator.active {
+            display: flex;
+            align-items: center;
+        }
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+        .typing-dots span {
+            height: 8px;
+            width: 8px;
+            background-color: #6366f1;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+        .response-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .response-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .response-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+        .response-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .response-container::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .status-indicator {
+            height: 8px;
+            width: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-healthy {
+            background-color: #10b981;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+        }
+        .status-unhealthy {
+            background-color: #ef4444;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+        }
+        .parameter-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: #e2e8f0;
+            outline: none;
+        }
+        .parameter-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #6366f1;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .parameter-slider::-moz-range-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #6366f1;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">
+                <i class="fas fa-balance-scale mr-3"></i>
+                Vietnamese Legal QA Assistant
+            </h1>
+            <p class="text-white text-opacity-80 text-lg">
+                Get answers to your Vietnamese legal questions powered by AI
+            </p>
+            
+            <!-- Status Indicator -->
+            <div class="mt-4">
+                <div id="status-container" class="inline-flex items-center bg-white bg-opacity-20 rounded-full px-4 py-2">
+                    <span id="status-dot" class="status-indicator status-unhealthy"></span>
+                    <span id="status-text" class="text-white text-sm">Checking connection...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Main Chat Interface -->
+            <div class="lg:col-span-2">
+                <div class="glass p-6">
+                    <!-- Question Input -->
+                    <div class="mb-6">
+                        <label for="question" class="block text-gray-700 text-sm font-bold mb-2">
+                            <i class="fas fa-question-circle mr-2"></i>Your Legal Question
+                        </label>
+                        <div class="relative">
+                            <textarea 
+                                id="question" 
+                                placeholder="Ask your Vietnamese legal question here... (e.g., 'What are the labor laws for employees in Vietnam?')"
+                                class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none transition-all duration-200"
+                                rows="4"
+                            ></textarea>
+                            <button 
+                                id="ask-btn" 
+                                class="absolute bottom-4 right-4 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg transition-all duration-200 flex items-center"
+                            >
+                                <i class="fas fa-paper-plane mr-2"></i>Ask
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Typing Indicator -->
+                    <div id="typing-indicator" class="typing-indicator mb-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-robot text-indigo-600 mr-3"></i>
+                            <span class="text-gray-600 mr-3">AI is thinking</span>
+                            <div class="typing-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Response Area -->
+                    <div id="response-container" class="response-container">
+                        <div id="welcome-message" class="text-center py-12 text-gray-500">
+                            <i class="fas fa-comments text-6xl mb-4"></i>
+                            <h3 class="text-xl font-semibold mb-2">Welcome to Vietnamese Legal QA</h3>
+                            <p>Ask any question about Vietnamese law and get AI-powered answers.</p>
+                        </div>
+                        
+                        <div id="chat-history" class="space-y-6"></div>
+                    </div>
+
+                    <!-- Sample Questions -->
+                    <div class="mt-6 border-t pt-6">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3">
+                            <i class="fas fa-lightbulb mr-2"></i>Sample Questions
+                        </h3>
+                        <div class="flex flex-wrap gap-2">
+                            <button class="sample-question bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-full text-sm transition-colors">
+                                What are Vietnamese labor rights?
+                            </button>
+                            <button class="sample-question bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-full text-sm transition-colors">
+                                How to register a business in Vietnam?
+                            </button>
+                            <button class="sample-question bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-full text-sm transition-colors">
+                                What are the tax obligations?
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Panel -->
+            <div class="lg:col-span-1">
+                <div class="space-y-6">
+                    <!-- AI Parameters -->
+                    <div class="glass p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-sliders-h mr-2"></i>AI Parameters
+                        </h3>
+                        
+                        <!-- Max Length -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Max Response Length: <span id="max-length-value">512</span>
+                            </label>
+                            <input 
+                                type="range" 
+                                id="max-length" 
+                                min="100" 
+                                max="2048" 
+                                value="512" 
+                                class="parameter-slider w-full"
+                            >
+                        </div>
+
+                        <!-- Temperature -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Temperature (Creativity): <span id="temperature-value">0.7</span>
+                            </label>
+                            <input 
+                                type="range" 
+                                id="temperature" 
+                                min="0" 
+                                max="2" 
+                                step="0.1" 
+                                value="0.7" 
+                                class="parameter-slider w-full"
+                            >
+                        </div>
+
+                        <!-- Top P -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Top-p (Focus): <span id="top-p-value">0.9</span>
+                            </label>
+                            <input 
+                                type="range" 
+                                id="top-p" 
+                                min="0.1" 
+                                max="1" 
+                                step="0.1" 
+                                value="0.9" 
+                                class="parameter-slider w-full"
+                            >
+                        </div>
+
+                        <!-- API Key -->
+                        {% if has_api_key %}
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                API Key
+                            </label>
+                            <input 
+                                type="password" 
+                                id="api-key" 
+                                placeholder="Enter your API key"
+                                class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                            >
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="glass p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-bolt mr-2"></i>Quick Actions
+                        </h3>
+                        
+                        <div class="space-y-3">
+                            <button id="sample-btn" class="w-full bg-green-100 hover:bg-green-200 text-green-800 py-2 px-4 rounded-lg transition-colors flex items-center">
+                                <i class="fas fa-flask mr-2"></i>Get Sample QA
+                            </button>
+                            
+                            <button id="compare-btn" class="w-full bg-blue-100 hover:bg-blue-200 text-blue-800 py-2 px-4 rounded-lg transition-colors flex items-center">
+                                <i class="fas fa-balance-scale mr-2"></i>Compare Endpoints
+                            </button>
+                            
+                            <button id="clear-btn" class="w-full bg-red-100 hover:bg-red-200 text-red-800 py-2 px-4 rounded-lg transition-colors flex items-center">
+                                <i class="fas fa-trash mr-2"></i>Clear History
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- API Info -->
+                    <div class="glass p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-info-circle mr-2"></i>API Information
+                        </h3>
+                        
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div>
+                                <strong>Gradio API:</strong><br>
+                                <code class="bg-gray-100 px-2 py-1 rounded text-xs break-all">{{ api_url }}</code>
+                            </div>
+                            <div>
+                                <strong>Authentication:</strong>
+                                {% if has_api_key %}
+                                <span class="text-orange-600">Required</span>
+                                {% else %}
+                                <span class="text-green-600">None</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mt-4 pt-4 border-t">
+                            <a href="/docs" target="_blank" class="text-indigo-600 hover:text-indigo-800 text-sm flex items-center">
+                                <i class="fas fa-book mr-2"></i>View API Documentation
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        const HAS_API_KEY = {{ has_api_key|tojson }};
+
+        // DOM Elements
+        const questionInput = document.getElementById('question');
+        const askBtn = document.getElementById('ask-btn');
+        const responseContainer = document.getElementById('response-container');
+        const chatHistory = document.getElementById('chat-history');
+        const welcomeMessage = document.getElementById('welcome-message');
+        const typingIndicator = document.getElementById('typing-indicator');
+        
+        // Parameter inputs
+        const maxLengthInput = document.getElementById('max-length');
+        const temperatureInput = document.getElementById('temperature');
+        const topPInput = document.getElementById('top-p');
+        const apiKeyInput = document.getElementById('api-key');
+        
+        // Parameter value displays
+        const maxLengthValue = document.getElementById('max-length-value');
+        const temperatureValue = document.getElementById('temperature-value');
+        const topPValue = document.getElementById('top-p-value');
+        
+        // Action buttons
+        const sampleBtn = document.getElementById('sample-btn');
+        const compareBtn = document.getElementById('compare-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const sampleQuestions = document.querySelectorAll('.sample-question');
+
+        // Status elements
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        // Update parameter displays
+        maxLengthInput.addEventListener('input', () => {
+            maxLengthValue.textContent = maxLengthInput.value;
+        });
+
+        temperatureInput.addEventListener('input', () => {
+            temperatureValue.textContent = parseFloat(temperatureInput.value).toFixed(1);
+        });
+
+        topPInput.addEventListener('input', () => {
+            topPValue.textContent = parseFloat(topPInput.value).toFixed(1);
+        });
+
+        // Check API health
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (data.status === 'healthy') {
+                    statusDot.className = 'status-indicator status-healthy';
+                    statusText.textContent = 'API Connected';
+                } else {
+                    statusDot.className = 'status-indicator status-unhealthy';
+                    statusText.textContent = data.message || 'API Unavailable';
+                }
+            } catch (error) {
+                console.error('Health check failed:', error);
+                statusDot.className = 'status-indicator status-unhealthy';
+                statusText.textContent = 'Connection Error';
+            }
+        }
+
+        // Get headers for API requests
+        function getHeaders() {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (HAS_API_KEY && apiKeyInput && apiKeyInput.value) {
+                headers['X-API-Key'] = apiKeyInput.value;
+            }
+            
+            return headers;
+        }
+
+        // Add message to chat
+        function addMessage(question, response, type = 'single') {
+            welcomeMessage.style.display = 'none';
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'chat-message';
+            
+            let content = `
+                <div class="bg-gray-50 p-4 rounded-lg mb-3">
+                    <div class="flex items-start">
+                        <i class="fas fa-user text-indigo-600 mr-3 mt-1"></i>
+                        <div class="flex-1">
+                            <p class="font-semibold text-gray-800 mb-1">You asked:</p>
+                            <p class="text-gray-700">${question}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (type === 'compare') {
+                content += `
+                    <div class="bg-white p-4 rounded-lg border-l-4 border-indigo-500">
+                        <div class="flex items-start mb-4">
+                            <i class="fas fa-robot text-indigo-600 mr-3 mt-1"></i>
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800 mb-2">AI Response (Endpoint 1):</p>
+                                <p class="text-gray-700 whitespace-pre-wrap">${response.endpoint_1}</p>
+                            </div>
+                        </div>
+                        <hr class="my-4">
+                        <div class="flex items-start">
+                            <i class="fas fa-robot text-green-600 mr-3 mt-1"></i>
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800 mb-2">AI Response (Endpoint 2):</p>
+                                <p class="text-gray-700 whitespace-pre-wrap">${response.endpoint_2}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                content += `
+                    <div class="bg-white p-4 rounded-lg border-l-4 border-indigo-500">
+                        <div class="flex items-start">
+                            <i class="fas fa-robot text-indigo-600 mr-3 mt-1"></i>
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800 mb-2">AI Response:</p>
+                                <p class="text-gray-700 whitespace-pre-wrap">${response}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            messageDiv.innerHTML = content;
+            chatHistory.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            responseContainer.scrollTop = responseContainer.scrollHeight;
+        }
+
+        // Show/hide typing indicator
+        function showTyping(show = true) {
+            typingIndicator.classList.toggle('active', show);
+            if (show) {
+                welcomeMessage.style.display = 'none';
+                responseContainer.scrollTop = responseContainer.scrollHeight;
+            }
+        }
+
+        // Ask question
+        async function askQuestion(question = null) {
+            const userQuestion = question || questionInput.value.trim();
+            
+            if (!userQuestion) {
+                alert('Please enter a question');
+                return;
+            }
+
+            try {
+                askBtn.disabled = true;
+                askBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Asking...';
+                showTyping(true);
+
+                const requestData = {
+                    user_input: userQuestion,
+                    max_length: parseInt(maxLengthInput.value),
+                    temperature: parseFloat(temperatureInput.value),
+                    top_p: parseFloat(topPInput.value)
+                };
+
+                const response = await fetch(`${API_BASE}/generate`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+                
+                showTyping(false);
+                
+                if (data.status === 'success') {
+                    addMessage(userQuestion, data.response);
+                    if (!question) questionInput.value = '';
+                } else {
+                    addMessage(userQuestion, `Error: ${data.error || 'Unknown error occurred'}`);
+                }
+
+            } catch (error) {
+                showTyping(false);
+                addMessage(userQuestion, `Connection error: ${error.message}`);
+            } finally {
+                askBtn.disabled = false;
+                askBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Ask';
+            }
+        }
+
+        // Compare endpoints
+        async function compareEndpoints() {
+            const userQuestion = questionInput.value.trim();
+            
+            if (!userQuestion) {
+                alert('Please enter a question to compare');
+                return;
+            }
+
+            try {
+                compareBtn.disabled = true;
+                compareBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Comparing...';
+                showTyping(true);
+
+                const requestData = {
+                    user_input: userQuestion,
+                    max_length: parseInt(maxLengthInput.value),
+                    temperature: parseFloat(temperatureInput.value),
+                    top_p: parseFloat(topPInput.value)
+                };
+
+                const response = await fetch(`${API_BASE}/compare`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+                
+                showTyping(false);
+                
+                if (data.status === 'success') {
+                    addMessage(userQuestion, data.responses, 'compare');
+                    questionInput.value = '';
+                } else {
+                    addMessage(userQuestion, `Error: ${data.error || 'Unknown error occurred'}`);
+                }
+
+            } catch (error) {
+                showTyping(false);
+                addMessage(userQuestion, `Connection error: ${error.message}`);
+            } finally {
+                compareBtn.disabled = false;
+                compareBtn.innerHTML = '<i class="fas fa-balance-scale mr-2"></i>Compare Endpoints';
+            }
+        }
+
+        // Get sample data
+        async function getSampleData() {
+            try {
+                sampleBtn.disabled = true;
+                sampleBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading...';
+                showTyping(true);
+
+                const response = await fetch(`${API_BASE}/sample`, {
+                    headers: getHeaders()
+                });
+
+                const data = await response.json();
+                
+                showTyping(false);
+                
+                if (data.status === 'success') {
+                    addMessage(data.sample_question, data.sample_response);
+                } else {
+                    addMessage('Sample Request', `Error: ${data.error || 'Unable to get sample data'}`);
+                }
+
+            } catch (error) {
+                showTyping(false);
+                addMessage('Sample Request', `Connection error: ${error.message}`);
+            } finally {
+                sampleBtn.disabled = false;
+                sampleBtn.innerHTML = '<i class="fas fa-flask mr-2"></i>Get Sample QA';
+            }
+        }
+
+        // Clear chat history
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear the chat history?')) {
+                chatHistory.innerHTML = '';
+                welcomeMessage.style.display = 'block';
+            }
+        }
+
+        // Event listeners
+        askBtn.addEventListener('click', () => askQuestion());
+        
+        questionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                askQuestion();
+            }
+        });
+
+        compareBtn.addEventListener('click', compareEndpoints);
+        sampleBtn.addEventListener('click', getSampleData);
+        clearBtn.addEventListener('click', clearHistory);
+
+        // Sample question buttons
+        sampleQuestions.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const question = btn.textContent;
+                questionInput.value = question;
+                askQuestion();
+            });
+        });
+
+        // Auto-resize textarea
+        questionInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Initialize
+        checkHealth();
+        
+        // Check health every 30 seconds
+        setInterval(checkHealth, 30000);
+
+        // Focus on question input when page loads
+        questionInput.focus();
+    </script>
+</body>
+</html>
